@@ -97,6 +97,81 @@ def init_db():
         conn.commit()
 
 # ── Prediction logic ───────────────────────────────────────────────────────────
+
+def explain_prediction(feats: dict, prediction: str) -> list:
+    """
+    Generate plain-English reasons for a prediction.
+    This is called 'explainability' — showing WHY the model decided what it did.
+    It makes the tool trustworthy instead of a black box.
+    """
+    reasons = []
+
+    # ── Red flags (push toward PHISHING) ──────────────────────────────────────
+    if feats.get('has_ip'):
+        reasons.append({
+            'level': 'high',
+            'text':  'Uses IP address instead of a domain name'
+        })
+    if feats.get('suspicious_tld'):
+        reasons.append({
+            'level': 'high',
+            'text':  'Suspicious TLD (.tk .ml .xyz etc.) — free domains heavily abused for phishing'
+        })
+    if feats.get('brand_impersonation'):
+        reasons.append({
+            'level': 'high',
+            'text':  'Brand name in domain but this is not the real brand website'
+        })
+    if feats.get('has_port'):
+        reasons.append({
+            'level': 'high',
+            'text':  'Non-standard port number in URL — rare on legitimate sites'
+        })
+    if feats.get('n_suspicious_keywords', 0) > 0:
+        reasons.append({
+            'level': 'medium',
+            'text':  f'{int(feats["n_suspicious_keywords"])} suspicious keyword(s) in URL (e.g. verify, account, suspended)'
+        })
+    if feats.get('too_many_subdomains'):
+        reasons.append({
+            'level': 'medium',
+            'text':  'Too many subdomains — common trick to disguise the real domain'
+        })
+    if feats.get('digit_ratio', 0) > 0.35:
+        reasons.append({
+            'level': 'medium',
+            'text':  f'High digit ratio ({round(feats["digit_ratio"] * 100)}%) — suggests IP-based or auto-generated URL'
+        })
+    if feats.get('has_https') == 0 and prediction == 'PHISHING':
+        reasons.append({
+            'level': 'medium',
+            'text':  'No HTTPS — connection is unencrypted'
+        })
+    if feats.get('url_length', 0) > 100:
+        reasons.append({
+            'level': 'low',
+            'text':  f'Unusually long URL ({int(feats["url_length"])} characters)'
+        })
+    if feats.get('num_hyphens', 0) > 3:
+        reasons.append({
+            'level': 'low',
+            'text':  f'Many hyphens ({int(feats["num_hyphens"])}) — common in fake lookalike domains'
+        })
+
+    # ── Green flags (shown when LEGIT) ────────────────────────────────────────
+    if prediction == 'LEGIT':
+        if feats.get('has_https'):
+            reasons.append({'level': 'good', 'text': 'Uses HTTPS encryption'})
+        if not feats.get('suspicious_tld') and not feats.get('has_ip'):
+            reasons.append({'level': 'good', 'text': 'Standard domain with recognised TLD'})
+        if not feats.get('brand_impersonation'):
+            reasons.append({'level': 'good', 'text': 'No brand impersonation detected'})
+        if feats.get('n_suspicious_keywords', 0) == 0:
+            reasons.append({'level': 'good', 'text': 'No suspicious keywords in URL'})
+
+    return reasons[:5]   # cap at 5 so the UI stays clean
+
+
 def run_prediction(url: str) -> dict:
     feats     = extract_features(url)
     X         = pd.DataFrame([feats])[metadata['feature_names']].fillna(-1)
@@ -109,13 +184,16 @@ def run_prediction(url: str) -> dict:
     elif proba >= 0.40: risk = 'MEDIUM'
     else:               risk = 'LOW'
 
+    prediction = 'PHISHING' if is_phish else 'LEGIT'
+
     return {
         'url':         url,
-        'prediction':  'PHISHING' if is_phish else 'LEGIT',
+        'prediction':  prediction,
         'confidence':  round(proba * 100, 1),
         'risk':        risk,
         'is_phishing': is_phish,
         'scanned_at':  datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'reasons':     explain_prediction(feats, prediction),
     }
 
 # ── Routes ─────────────────────────────────────────────────────────────────────

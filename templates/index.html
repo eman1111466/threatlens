@@ -79,8 +79,13 @@ tr:hover td{background:#1c2128}
 .empty{text-align:center;color:#484f58;padding:40px;font-size:14px}
 
 /* Spinner */
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
-@keyframes spin{to{transform:rotate(360deg)}}
+.reason-item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:13px;border-bottom:1px solid #21262d30}
+.reason-item:last-child{border-bottom:none}
+.reason-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.reason-dot.high{background:#f85149}
+.reason-dot.medium{background:#d29922}
+.reason-dot.low{background:#8b949e}
+.reason-dot.good{background:#3fb950}
 </style>
 </head>
 <body>
@@ -113,6 +118,10 @@ tr:hover td{background:#1c2128}
       <div class="conf-bar-wrap">
         <div class="conf-label" id="conf-label">Confidence: —</div>
         <div class="conf-bar"><div class="conf-fill" id="conf-fill" style="width:0%"></div></div>
+      </div>
+      <div id="reasons-wrap" style="margin-top:14px;display:none">
+        <div style="font-size:12px;color:#8b949e;margin-bottom:8px;font-weight:500">Why this verdict:</div>
+        <div id="reasons-list"></div>
       </div>
     </div>
   </div>
@@ -201,6 +210,8 @@ function showResult(data) {
   const urlEl  = document.getElementById('result-url');
   const confL  = document.getElementById('conf-label');
   const confF  = document.getElementById('conf-fill');
+  const reasonsWrap = document.getElementById('reasons-wrap');
+  const reasonsList = document.getElementById('reasons-list');
 
   card.className  = `result ${data.risk}`;
   card.style.display = 'block';
@@ -214,6 +225,19 @@ function showResult(data) {
 
   const colors = {CRITICAL:'#f85149', HIGH:'#d29922', MEDIUM:'#e3b341', LOW:'#3fb950'};
   confF.style.background = colors[data.risk] || '#58a6ff';
+
+  // Show reasons
+  if (data.reasons && data.reasons.length > 0) {
+    reasonsWrap.style.display = 'block';
+    reasonsList.innerHTML = data.reasons.map(r => `
+      <div class="reason-item">
+        <div class="reason-dot ${r.level}"></div>
+        <div style="color:${r.level==='good'?'#3fb950':r.level==='high'?'#f85149':r.level==='medium'?'#d29922':'#8b949e'}">${r.text}</div>
+      </div>
+    `).join('');
+  } else {
+    reasonsWrap.style.display = 'none';
+  }
 }
 
 async function loadStats() {
