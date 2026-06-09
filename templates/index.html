@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreatLens — Threat Intelligence Platform</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+
+/* Layout */
+.header{background:#161b22;border-bottom:1px solid #30363d;padding:16px 32px;display:flex;align-items:center;gap:12px}
+.logo{font-size:20px;font-weight:600;color:#58a6ff;letter-spacing:-0.3px}
+.logo span{color:#3fb950}
+.subtitle{font-size:13px;color:#8b949e;margin-top:1px}
+.badge{margin-left:auto;background:#1f6feb22;border:1px solid #1f6feb55;color:#58a6ff;font-size:11px;padding:3px 10px;border-radius:20px}
+
+.main{max-width:1100px;margin:0 auto;padding:32px 24px}
+
+/* Scanner */
+.scanner{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;margin-bottom:28px}
+.scanner h2{font-size:15px;font-weight:500;margin-bottom:16px;color:#8b949e}
+.scan-row{display:flex;gap:10px}
+.scan-input{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px 14px;color:#e6edf3;font-size:14px;outline:none;transition:border-color .2s}
+.scan-input:focus{border-color:#58a6ff}
+.scan-input::placeholder{color:#484f58}
+.scan-btn{background:#238636;border:1px solid #2ea043;color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;transition:background .15s}
+.scan-btn:hover{background:#2ea043}
+.scan-btn:disabled{opacity:.5;cursor:default}
+
+/* Result card */
+.result{margin-top:16px;border-radius:8px;padding:16px 20px;display:none;border-left:4px solid}
+.result.CRITICAL{background:#f8514915;border-color:#f85149}
+.result.HIGH{background:#d2992215;border-color:#d29922}
+.result.MEDIUM{background:#e3b34115;border-color:#e3b341}
+.result.LOW{background:#3fb95015;border-color:#3fb950}
+.result-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.result-label{font-size:18px;font-weight:600}
+.result-label.PHISHING{color:#f85149}
+.result-label.LEGIT{color:#3fb950}
+.risk-badge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;letter-spacing:.5px}
+.risk-CRITICAL{background:#f8514930;color:#f85149}
+.risk-HIGH{background:#d2992230;color:#d29922}
+.risk-MEDIUM{background:#e3b34130;color:#e3b341}
+.risk-LOW{background:#3fb95030;color:#3fb950}
+.result-url{font-size:12px;color:#8b949e;margin-top:6px;word-break:break-all;font-family:monospace}
+.conf-bar-wrap{margin-top:10px}
+.conf-label{font-size:12px;color:#8b949e;margin-bottom:4px}
+.conf-bar{height:4px;background:#21262d;border-radius:2px;overflow:hidden}
+.conf-fill{height:100%;border-radius:2px;transition:width .5s}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px}
+.stat-label{font-size:12px;color:#8b949e;margin-bottom:6px}
+.stat-value{font-size:28px;font-weight:600;line-height:1}
+.stat-sub{font-size:12px;color:#8b949e;margin-top:4px}
+.stat-value.blue{color:#58a6ff}
+.stat-value.red{color:#f85149}
+.stat-value.green{color:#3fb950}
+.stat-value.amber{color:#d29922}
+
+/* Table */
+.table-section{background:#161b22;border:1px solid #30363d;border-radius:12px;overflow:hidden}
+.table-header{padding:16px 20px;border-bottom:1px solid #21262d;display:flex;align-items:center;justify-content:space-between}
+.table-header h2{font-size:14px;font-weight:500}
+.refresh-btn{background:none;border:1px solid #30363d;color:#8b949e;padding:4px 12px;border-radius:6px;font-size:12px;cursor:pointer}
+.refresh-btn:hover{color:#e6edf3;border-color:#8b949e}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;color:#8b949e;font-weight:500;padding:10px 16px;border-bottom:1px solid #21262d}
+td{padding:10px 16px;font-size:13px;border-bottom:1px solid #21262d30;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#1c2128}
+.url-cell{max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:12px;color:#8b949e}
+.pred-cell{font-weight:500}
+.pred-cell.PHISHING{color:#f85149}
+.pred-cell.LEGIT{color:#3fb950}
+.conf-cell{color:#8b949e}
+.empty{text-align:center;color:#484f58;padding:40px;font-size:14px}
+
+/* Spinner */
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">Threat<span>Lens</span></div>
+    <div class="subtitle">Threat Intelligence Platform · PhishProof ML Engine</div>
+  </div>
+  <div class="badge" id="model-badge">Loading...</div>
+</div>
+
+<div class="main">
+
+  <!-- URL Scanner -->
+  <div class="scanner">
+    <h2>URL Scanner</h2>
+    <div class="scan-row">
+      <input class="scan-input" id="url-input" type="text"
+        placeholder="Enter URL to scan e.g. https://suspicious-site.com"
+        onkeydown="if(event.key==='Enter') scanUrl()">
+      <button class="scan-btn" id="scan-btn" onclick="scanUrl()">Scan URL</button>
+    </div>
+    <div class="result" id="result-card">
+      <div class="result-top">
+        <div class="result-label" id="result-label">—</div>
+        <div class="risk-badge" id="risk-badge">—</div>
+      </div>
+      <div class="result-url" id="result-url"></div>
+      <div class="conf-bar-wrap">
+        <div class="conf-label" id="conf-label">Confidence: —</div>
+        <div class="conf-bar"><div class="conf-fill" id="conf-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats cards -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Total scanned</div>
+      <div class="stat-value blue" id="stat-total">—</div>
+      <div class="stat-sub">all time</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Phishing detected</div>
+      <div class="stat-value red" id="stat-phishing">—</div>
+      <div class="stat-sub" id="stat-phishing-pct">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Legit URLs</div>
+      <div class="stat-value green" id="stat-legit">—</div>
+      <div class="stat-sub" id="stat-legit-pct">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Model AUC</div>
+      <div class="stat-value amber" id="stat-auc">—</div>
+      <div class="stat-sub" id="stat-model">—</div>
+    </div>
+  </div>
+
+  <!-- Recent detections -->
+  <div class="table-section">
+    <div class="table-header">
+      <h2>Recent detections</h2>
+      <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>URL</th>
+          <th>Verdict</th>
+          <th>Confidence</th>
+          <th>Risk</th>
+          <th>Scanned at</th>
+        </tr>
+      </thead>
+      <tbody id="detections-body">
+        <tr><td colspan="5" class="empty">No scans yet — enter a URL above to start</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+const API = '';
+
+async function scanUrl() {
+  const input = document.getElementById('url-input');
+  const btn   = document.getElementById('scan-btn');
+  const url   = input.value.trim();
+  if (!url) return;
+
+  btn.disabled  = true;
+  btn.innerHTML = '<span class="spinner"></span>Scanning...';
+
+  try {
+    const res  = await fetch(`${API}/api/scan`, {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({url})
+    });
+    const data = await res.json();
+    showResult(data);
+    loadData();
+  } catch(e) {
+    alert('Error connecting to ThreatLens API. Make sure app.py is running.');
+  } finally {
+    btn.disabled  = false;
+    btn.innerHTML = 'Scan URL';
+  }
+}
+
+function showResult(data) {
+  const card   = document.getElementById('result-card');
+  const label  = document.getElementById('result-label');
+  const badge  = document.getElementById('risk-badge');
+  const urlEl  = document.getElementById('result-url');
+  const confL  = document.getElementById('conf-label');
+  const confF  = document.getElementById('conf-fill');
+
+  card.className  = `result ${data.risk}`;
+  card.style.display = 'block';
+  label.className = `result-label ${data.prediction}`;
+  label.textContent = data.prediction;
+  badge.className = `risk-badge risk-${data.risk}`;
+  badge.textContent = data.risk;
+  urlEl.textContent = data.url;
+  confL.textContent = `Confidence: ${data.confidence}%`;
+  confF.style.width = data.confidence + '%';
+
+  const colors = {CRITICAL:'#f85149', HIGH:'#d29922', MEDIUM:'#e3b341', LOW:'#3fb950'};
+  confF.style.background = colors[data.risk] || '#58a6ff';
+}
+
+async function loadStats() {
+  try {
+    const res  = await fetch(`${API}/api/stats`);
+    const data = await res.json();
+    const total = data.total || 0;
+
+    document.getElementById('stat-total').textContent    = total;
+    document.getElementById('stat-phishing').textContent = data.phishing || 0;
+    document.getElementById('stat-legit').textContent    = data.legit    || 0;
+    document.getElementById('stat-auc').textContent      = data.auc      || '—';
+    document.getElementById('stat-model').textContent    = data.model_name || '—';
+
+    const pp = total ? Math.round((data.phishing/total)*100) : 0;
+    const lp = total ? Math.round((data.legit/total)*100)    : 0;
+    document.getElementById('stat-phishing-pct').textContent = total ? `${pp}% of scans` : 'no scans yet';
+    document.getElementById('stat-legit-pct').textContent    = total ? `${lp}% of scans` : 'no scans yet';
+    document.getElementById('model-badge').textContent       = `${data.model_name} · AUC ${data.auc}`;
+  } catch(e) {
+    console.error('Stats error:', e);
+  }
+}
+
+async function loadRecent() {
+  try {
+    const res  = await fetch(`${API}/api/recent?limit=20`);
+    const rows = await res.json();
+    const tbody = document.getElementById('detections-body');
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No scans yet — enter a URL above to start</td></tr>';
+      return;
+    }
+
+    const riskColor = {CRITICAL:'#f85149', HIGH:'#d29922', MEDIUM:'#e3b341', LOW:'#3fb950'};
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td class="url-cell" title="${r.url}">${r.url}</td>
+        <td class="pred-cell ${r.prediction}">${r.prediction}</td>
+        <td class="conf-cell">${r.confidence}%</td>
+        <td><span style="color:${riskColor[r.risk]||'#8b949e'};font-size:12px;font-weight:600">${r.risk}</span></td>
+        <td class="conf-cell">${r.scanned_at}</td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    console.error('Recent error:', e);
+  }
+}
+
+function loadData() {
+  loadStats();
+  loadRecent();
+}
+
+// Load on startup and auto-refresh every 30 seconds
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>
